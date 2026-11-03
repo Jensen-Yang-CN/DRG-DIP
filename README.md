@@ -88,7 +88,9 @@ flowchart TD
 
 ## 数据来源与程序结构
 
-仓库内的 `data/rules.json` 是从《按病种分值（DIP）付费3.0版分组方案》工作簿导出的规则快照，保留了工作表名称、Excel 行号和单元格值。**原始 `.xlsx` 工作簿位于本项目目录之外，未包含在仓库中。**
+仓库内的 `data/rules.json` 是从[《按病种分值（DIP）付费3.0版分组方案》](data/source/按病种分值（DIP）付费3.0版分组方案.xlsx)导出的规则快照，保留了工作表名称、Excel 行号和单元格值。原始 DIP 工作簿已放在 `data/source/`，可用于核对规则与重新导出。
+
+`data/source/` 还保存了[《按病组（DRG）付费3.0版分组方案配置信息》](data/source/按病组（DRG）付费3.0版分组方案配置信息.xlsx)。当前项目实现的是 **DIP 分组演示**；该 DRG 工作簿作为参考资料提供，**不参与当前分组计算**。导出脚本按工作表名称读取，并将操作排除表中以数值存储的 `33.24` 恢复为完整编码 `33.2400`，以保持规则快照可复现。
 
 | 规则内容 | 条数 |
 | --- | ---: |
@@ -109,7 +111,7 @@ flowchart LR
     A -->|提交病例| B
     B --> C[分组匹配：grouping.py]
     C --> D[规则快照：data/rules.json]
-    E[原始 Excel 工作簿] -->|scripts/export_rules.py 导出| D
+    E[仓库内 DIP 原始工作簿] -->|scripts/export_rules.py 导出| D
     C -->|命中规则、备选与路径| B
     B -->|JSON 结果| A
 ```
@@ -121,17 +123,18 @@ flowchart LR
 - `server.py`：静态页面、`/api/catalog` 编码建议和 `/api/group` 分组接口。
 - `grouping.py`：编码匹配、排除判断、候选选择及基层标识。
 - `data/rules.json`：服务启动时加载的规则快照。
+- `data/source/`：DIP 3.0 与 DRG 3.0 原始工作簿；当前仅 DIP 工作簿用于导出规则。
 - `scripts/export_rules.py`：从工作簿重新导出快照。
 - `tests/`：分组规则和 HTTP 接口检查。
 
-如果持有原始工作簿，需要重新导出规则数据，可先安装 `openpyxl`，再传入工作簿路径：
+需要从仓库内的 DIP 工作簿重新导出规则数据时，先安装 `openpyxl`，再运行：
 
 ```bash
 python -m pip install openpyxl
-python scripts/export_rules.py "工作簿的完整路径.xlsx"
+python scripts/export_rules.py
 ```
 
-导出后重新启动 Python 服务，使新快照生效。
+也可以把其他工作簿的完整路径作为参数传给脚本。导出后重新启动 Python 服务，使新快照生效。
 
 ## 说明
 
