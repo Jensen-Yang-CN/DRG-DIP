@@ -12,8 +12,6 @@
 DIP_Demo/
 ├── .gitignore                                      忽略 Python 缓存文件
 ├── README.md                                       项目说明、DIP/DRG 流程与运行方法
-├── start-demo.cmd                                  Windows 前台启动脚本
-├── restart-demo.ps1                                Windows 后台重启及 DRG 接口检查
 ├── server.py                                       本地 HTTP 服务、页面与分组接口
 ├── grouping.py                                     DIP 规则解释、匹配及结果生成
 ├── drg_grouping.py                                 DRG 表达式、MDC/ADRG/DRG、CC 排除与参考表查询
@@ -38,8 +36,7 @@ DIP_Demo/
 │       └── drg.png                                 DRG 分组结果预览图
 └── scripts/
     ├── export_rules.py                             从 DIP 工作簿重新生成 rules.json
-    ├── export_drg_rules.py                         从 DRG 工作簿和参考表生成 drg_rules.json
-    └── prepare-demo-start.ps1                      启动前检测并处理旧版 8765 服务
+    └── export_drg_rules.py                         从 DRG 工作簿和参考表生成 drg_rules.json
 ```
 
 ## 首页预览
@@ -64,15 +61,13 @@ DIP_Demo/
 
 ## 本地启动
 
-运行环境：Python 3.10 或更新版本。启动服务与使用现有规则快照无需第三方 Python 包。
+运行环境：Python 3.10 或更新版本。用 VS Code 打开项目根目录，在内置终端输入：
 
 ```bash
 python server.py
 ```
 
-浏览器打开 `http://127.0.0.1:8765/`。Windows 也可双击 `start-demo.cmd`。页面通过本地 Python 服务调用分组接口。
-
-启动脚本会处理 8765 端口上的旧服务，再启动当前代码。
+浏览器打开 `http://127.0.0.1:8765/`。页面通过本地 Python 服务调用分组接口；在终端按 `Ctrl+C` 停止服务。使用现有规则快照无需安装第三方 Python 包。
 
 需要让同一内网的其他设备访问时，可按实际网络与安全配置启动：
 

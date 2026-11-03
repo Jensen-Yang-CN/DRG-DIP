@@ -430,7 +430,7 @@ async function init() {
     applyMode('dip');
   } catch (error) {
     $('rule-stats').textContent = '规则加载失败';
-    showError(`无法连接 Python 分组服务：${error.message}。请运行 start-demo.cmd 启动。`);
+    showError(`无法连接 Python 分组服务：${error.message}。请在项目目录的终端运行 python server.py。`);
   }
   try {
     const response = await fetch('./api/catalog?mode=drg');
