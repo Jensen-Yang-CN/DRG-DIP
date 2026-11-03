@@ -35,3 +35,22 @@
 @media(max-width:1250px){.explorer-grid{grid-template-columns:1fr;gap:15px}.journey-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 10px}.journey-list li{min-height:38px}.journey-list li::before{display:none}}
 @media(max-width:600px){.explorer-panel{padding:19px}.explorer-panel .card-heading{align-items:flex-start}.explorer-link{white-space:normal;text-align:right;line-height:1.4}.journey-list{grid-template-columns:1fr}.journey-list li{min-height:40px}.case-button{gap:8px;padding:9px}.case-target{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.app-shell::before,.app-shell::after{animation:none}.case-button{transition:none}.case-button:hover{transform:none}}
+
+/* DIP and DRG are two views of the same case. */
+.mode-switch{display:inline-flex;gap:5px;margin-top:20px;padding:5px;background:#e7eef4;border:1px solid #d6e2ea;border-radius:10px}
+.mode-button{border:0;border-radius:7px;background:transparent;color:#536b7d;font-size:13px;font-weight:750;padding:10px 20px;transition:background .2s,color .2s,box-shadow .2s}
+.mode-button:hover{color:#1f5e7b;background:#f5f9fb}
+.mode-button.active{background:#fff;color:#164968;box-shadow:0 2px 8px #193d551c}
+.workspace{perspective:1700px}
+#page-book.mode-fade-out{animation:mode-fade-out .12s ease-in both}
+#page-book.mode-fade-in{animation:mode-fade-in .18s ease-out both}
+@keyframes mode-fade-out{from{opacity:1}to{opacity:0}}
+@keyframes mode-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes page-turn-out{from{transform:rotateY(0);opacity:1}to{transform:rotateY(-65deg);opacity:0}}
+@keyframes page-turn-in{from{transform:rotateY(65deg);opacity:0}to{transform:rotateY(0);opacity:1}}
+.path-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.fee-chip{background:#e5f3ee;border-color:#cce8db;color:#236a4d;font-weight:700}
+.reference-note{font-size:11px;color:#8191a0;line-height:1.6;margin:18px 0 0}
+.item-tag.severity{background:#fff0e7;color:#a05024}
+@media(max-width:760px){.path-grid{grid-template-columns:1fr}.intro{flex-direction:column;align-items:stretch}.intro-side{align-items:flex-start}.mode-switch{width:100%}.mode-button{flex:1}.topbar-right{display:none}}
+@media(prefers-reduced-motion:reduce){#page-book.mode-fade-out,#page-book.mode-fade-in{animation:none}}

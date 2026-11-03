@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
-    <title>分组匹配流程 · DIP 3.0 病种分组演示系统</title>
+    <title>DIP / DRG 3.0 分组匹配流程</title>
     <link rel="stylesheet" href="./styles.css?v=explorer-1" />
     <link rel="stylesheet" href="./flow.css" />
   </head>
@@ -20,8 +20,8 @@
             alt="北京大学校徽"
           />
           <div>
-            <strong>北武院 DIP 病种分组演示系统</strong
-            ><small>当前规则：全国版 DIP 3.0</small>
+            <strong>北武院 DIP / DRG 分组演示系统</strong
+            ><small id="flow-brand-rule">当前流程：CHS-DIP 3.0</small>
           </div>
         </div>
         <div class="topbar-right">
@@ -30,6 +30,15 @@
       </header>
 
       <main class="workspace flow-workspace">
+        <div class="flow-mode-row">
+          <div class="mode-switch" role="group" aria-label="切换分组流程">
+            <button id="flow-mode-dip" class="mode-button active" type="button" aria-pressed="true">DIP 流程</button>
+            <button id="flow-mode-drg" class="mode-button" type="button" aria-pressed="false">DRG 流程</button>
+          </div>
+          <span>当前页面内切换，病例页面保持原样</span>
+        </div>
+        <div id="flow-book">
+        <div id="dip-flow" class="flow-page">
         <div class="eyebrow">CHS-DIP · 3.0</div>
         <h1>分组匹配流程</h1>
         <p class="flow-lead">
@@ -174,7 +183,7 @@
           </div>
           <p>
             性别、年龄（岁）和住院天数目前不参与这份 Demo
-            的核心规则判断。新生儿先期分组会读取<strong>出生天龄与出生体重</strong>；年龄填
+            的核心规则判断。新生儿先期分组会读取<strong>天龄与入院体重</strong>；年龄填
             0 岁时，页面才显示天龄输入。
           </p>
         </section>
@@ -275,7 +284,7 @@
                   <td>1 · XQ</td>
                   <td>一、先期分组</td>
                   <td>
-                    移植、ECMO、长时呼吸机等特殊操作，或新生儿诊断＋天龄＋出生体重。表中写明“不限定为主要操作”的规则可用其他操作命中。
+                    移植、ECMO、长时呼吸机等特殊操作，或新生儿诊断＋天龄＋入院体重。表中写明“不限定为主要操作”的规则可用其他操作命中。
                   </td>
                 </tr>
                 <tr>
@@ -430,7 +439,156 @@
             行，立即显示“不纳入分组”，不会继续处理主操作。
           </p>
         </section>
+        </div>
+        <div id="drg-flow" class="flow-page" hidden>
+          <div class="eyebrow">CHS-DRG · 3.0</div>
+          <h1>DRG 分组匹配流程</h1>
+          <p class="flow-lead">按配置工作簿的优先顺序检查规则，得到最终病组后，再查该方案的参考权重和费用。</p>
+          <section class="flow-card" id="drg-overview">
+            <span class="flow-index">01 · 总览</span>
+            <h2>从病例输入到参考费用</h2>
+            <div class="flow-diagram-wrap"><pre class="flow-diagram">输入病例 → 第一条诊断=ZYZD，其余=QTZD；第一条操作=ZYSS，其余=QTSS
+         → 性别=XB，年龄=NL，天龄=XSRTL，入院体重=XSRTZ
+  ↓
+按 MDC 表排序试规则：MDCA 先期分组 → MDCP 新生儿 → MDCZ 创伤 → 其他 MDC
+  ↓  读到 ZYZD in DI_B00：按完整编号 DI_B00 取诊断集合，检查主诊断编码
+     条件不成立继续下一条；成立则确定 MDC，停止本层查找
+  ↓
+只取该 MDC 的 ADRG 行，按排序试诊断／操作／年龄等条件 → 首个命中 ADRG
+  ↓
+只取该 ADRG 的 DRG 行，按排序逐条试条件
+  ↓  遇到 QTZD in CC/MCC：逐条查 CC 表及该诊断对应的排除表
+     排除后仍有有效 CC/MCC 才算条件成立；否则继续下一条 DRG
+  ↓
+首个命中 DRG（无条件末档可承接）→ 用最终 DRG 编码查本方案参考表
+  ↓
+显示 DRG 名称、参考权重、参考费用；缺少表值时显示“暂无参考数据”</pre></div>
+            <p class="flow-overview-note">规则来自项目内 CHS-DRG 3.0 配置工作簿的 MDC、ADRG、DRG、集合、CC 和排除表六张工作表。“集合”表中 <code>DI_</code> 是诊断编码集合，<code>OP_</code> 是手术／操作编码集合。运行时读取预先导出的快照，不逐次打开 Excel。</p>
+          </section>
+          <nav class="flow-nav" aria-label="DRG 流程目录">
+            <a href="#drg-overview">总览</a><a href="#drg-input">输入与字段</a><a href="#drg-mdc">MDC</a><a href="#drg-adrg">ADRG</a><a href="#drg-final">DRG</a><a href="#drg-cc">CC/MCC 与排除</a><a href="#drg-surgery">手术主次</a><a href="#drg-fee">权重与费用</a><a href="#drg-walkthrough">完整演算</a><a href="#drg-pitfalls">易错点</a><a href="#drg-cases">实测病例</a>
+          </nav>
+          <section class="flow-card" id="drg-input">
+            <span class="flow-index">02 · 输入与字段</span>
+            <h2>先确定“哪一条是主要的”，再把病例交给规则</h2>
+            <p>首页按添加顺序保存诊断和操作。第一条诊断是主要诊断 <code>ZYZD</code>，第二条起组成其他诊断 <code>QTZD</code>；第一条操作是主要操作 <code>ZYSS</code>，第二条起组成其他操作 <code>QTSS</code>。没有操作时，ZYSS 为空、QTSS 为空列表。调整顺序会改变这些字段，可能改变分组。</p>
+            <div class="flow-table-wrap"><table class="flow-table"><thead><tr><th>界面输入</th><th>规则变量</th><th>在规则中的作用</th></tr></thead><tbody>
+              <tr><td>第 1 条诊断；后续诊断</td><td><code>ZYZD</code>；<code>QTZD</code></td><td>主诊断可确定 MDC、ADRG；其他诊断可用于创伤等组合条件及 CC/MCC 细分。</td></tr>
+              <tr><td>第 1 条操作；后续操作</td><td><code>ZYSS</code>；<code>QTSS</code></td><td>先期分组和手术类 ADRG 可能检查主操作，有些规则还会检查其他操作。</td></tr>
+              <tr><td>性别；年龄</td><td><code>XB</code>；<code>NL</code></td><td>男=1、女=2；年龄按岁，用于性别相关 MDC 和儿科等规则。</td></tr>
+              <tr><td>天龄；入院体重（g）</td><td><code>XSRTL</code>；<code>XSRTZ</code></td><td>新生儿和相关细分规则读取；体重只填非负整数，不加字母或单位。</td></tr>
+            </tbody></table></div>
+            <p>输入编码后，页面会用编码查名称并显示建议：DRG 模式的名称索引来自工作簿“集合”、CC 和排除表导出的编码名称；可按部分编码或名称搜索，但选中或直接输入后的分组依据仍是<strong>完整编码</strong>，显示名称本身不参与规则判断。页面可预先显示 CC/MCC 标签；标签还不等于该条诊断通过了排除检查。</p>
+            <p>点击“执行 DRG 分组”时，浏览器把编码、性别、年龄、天龄、入院体重等送到本地分组接口。后端校验输入并按当前 DRG 工作簿快照计算。住院天数会随病例提交并校验，但当前分组规则没有把它作为上述匹配变量。</p>
+          </section>
+          <section class="flow-card" id="drg-mdc">
+            <span class="flow-index">03 · 确定 MDC</span>
+            <h2>逐条读 MDC 规则，条件成立才确定大类</h2>
+            <ol class="flow-chain">
+              <li>先看 MDC 表的排序。最前面是先期分组 <code>MDCA</code>：它没有普通的主诊断集合条件，要先试 MDCA 下的 ADRG 特殊操作规则；若命中，直接得到 MDCA 和相应 ADRG。</li>
+              <li>未进入 MDCA，再试 <code>MDCP</code> 新生儿规则、<code>MDCZ</code> 多发严重创伤规则等。它们会组合年龄、天龄、诊断或操作条件，不能跳过后直接从普通 DI 集合开始。</li>
+              <li>读到普通规则，如 <code>MDCB：ZYZD in DI_B00</code>，先在“集合”表按<strong>完整编号 DI_B00</strong> 取所有诊断编码，再检查主诊断编码是否属于该清单。属于则选 MDCB；不属于就试下一条 MDC。<code>I60.000</code> 是 DI_B00 中的一个实际编码。</li>
+              <li>有 <code>and</code> 的规则要同时满足。女性大类 <code>MDCN：(ZYZD in DI_N00) and (XB = 2)</code> 既要诊断属于 DI_N00，也要性别为女；男性大类 MDCM 对应 DI_M00 与 XB=1。</li>
+            </ol>
+            <p>这里的 <code>DI_</code> 是诊断集合编号，<code>OP_</code> 是手术／操作集合编号。编号的前缀可辨类型，不能只看 <code>DI_B</code> 就把多个集合合并；对 <code>DI_B00</code> 的成员判断也不是一律只比较 ICD 的前四个字符。<code>ZYZD in DI_B00</code> 不会去查 OP 集合。程序以工作簿完整集合编号和编码清单为准。</p>
+            <p>一个主诊断可能同时出现在多个 DI 集合，不能先给它定一个唯一的“DI 类”。例如 <code>C49.503</code> 同时在 DI_M00、DI_N00、DI_MR1、DI_NR1 中；女患者的 MDCM 性别条件不成立，MDCN 的诊断和性别条件成立，得到 <code>MDCN</code>。确定 MDC 后只进入这个大类的 ADRG，不把所有大类的 ADRG 混在一起找。</p>
+          </section>
+          <section class="flow-card" id="drg-adrg">
+            <span class="flow-index">04 · 确定 ADRG</span>
+            <h2>用已确定的 MDC 缩小范围，再按 ADRG 排序匹配</h2>
+            <p>ADRG 是核心病组。程序先筛出 ADRG 表中“所属 MDC”列等于当前 MDC 的行，再按该表排序逐条计算规则。条件可能写 <code>ZYZD in DI_...</code>、<code>ZYSS in OP_...</code>，也可能组合其他诊断、其他操作、天龄或体重；<code>and</code> 要全部成立，<code>or</code> 满足一支即可。未命中的行继续往下试，首个命中的行给出 ADRG 编码和名称。</p>
+            <p>例如女患者的 <code>C49.503</code> 已得到 MDCN，就只看 MDCN 下的 ADRG。该编码在 <code>DI_NR1</code> 中，满足 NR1 行的 <code>ZYZD in DI_NR1</code>，因此 ADRG 为 <code>NR1（女性生殖系统恶性肿瘤）</code>。<code>NR1</code> 来自 ADRG 表的编码列，不是从诊断编码的字符直接拼出来的。</p>
+            <p>再如 <code>J18.000</code> 在普通呼吸系统大类 MDCE 内，满足 <code>ES4：ZYZD in DI_ES4</code>，因此无更优先手术规则时得到 ADRG ES4。<code>OP_BB2</code> 是另一操作集合，只有规则明确写出 <code>ZYSS in OP_BB2</code> 等条件时才参与判断。若已选 MDC 下没有 ADRG 条件成立，当前 Demo 会显示未能完成分组，不会擅自换到下一 MDC。</p>
+          </section>
+          <section class="flow-card" id="drg-final">
+            <span class="flow-index">05 · 确定最终 DRG</span>
+            <h2>只读当前 ADRG 的 DRG 行，按优先顺序找首个满足者</h2>
+            <p>取得 ADRG 编码后，程序筛出 DRG 表里“所属 ADRG”相同的行，按 DRG 排序逐条试条件。DRG 行可以要求年龄或有效 CC/MCC，也可以没有条件；没有条件的末档在前面条件都不成立时接住病例。最终输出 DRG 编码及病组名称。<strong>不能看到一个 ADRG 就直接当作最终 DRG</strong>，也不能把其他 ADRG 的 DRG 行拿来试。</p>
+            <div class="flow-table-wrap"><table class="flow-table"><thead><tr><th>已得 ADRG</th><th>按排序检查的 DRG 条件</th><th>可能结果</th></tr></thead><tbody>
+              <tr><td>NR1</td><td><code>NR13：QTZD in {MCC, CC}</code>；其后 <code>NR15</code> 无条件</td><td>有有效 CC/MCC → NR13；否则 → NR15</td></tr>
+              <tr><td>ES4</td><td><code>ES41：QTZD in MCC</code>；<code>ES43：QTZD in CC</code>；其后 <code>ES45</code> 无条件</td><td>有效 MCC 优先于有效 CC；两者都没有 → ES45</td></tr>
+            </tbody></table></div>
+            <p>这里的“优先”来自 DRG 表排序，不是 CC 与 MCC 在所有 ADRG 中都固定对应某个末位数字。规则具体写什么、如何排序，就按该 ADRG 的表行判断。</p>
+          </section>
+          <section class="flow-card" id="drg-cc">
+            <span class="flow-index">06 · CC/MCC 与排除</span>
+            <h2>其他诊断先查类型，再查它自己的排除表</h2>
+            <ol class="flow-chain">
+              <li>只有 DRG 条件要求 <code>QTZD in CC</code>、<code>QTZD in MCC</code> 或 <code>QTZD in {MCC, CC}</code> 时，CC/MCC 才会决定这条条件是否成立。CC 是一般合并症或并发症，MCC 是严重合并症或并发症。</li>
+              <li>对每条候选其他诊断，以完整编码查“CC”表，读取其 CC/MCC 类型和排除表编号。没有对应 CC/MCC 类型的编码不能据此触发该条件。</li>
+              <li>再拿<strong>这条其他诊断对应的排除表编号</strong>去“排除表”取主诊断清单。若本病例主诊断在该排除集合中，这条其他诊断在本病例中不能作为有效 CC/MCC；若不在，才可以参与当前 DRG 条件。</li>
+              <li>一个条件只要有一条符合要求且未被排除的其他诊断，就可成立；但仍须按当前 ADRG 的 DRG 行排序判断。不能看到第一个 CC 就忽略后面的 MCC，排除检查也不能把几个其他诊断混用同一个编号。</li>
+            </ol>
+            <p>具体例子：<code>C49.503</code> 为主诊断，<code>I50.900x001</code> 为其他诊断。CC 表将后者标为 <code>CC</code>，并指向 <code>EX_45</code>。EX_45 中没有主诊断 C49.503，故它在本病例中是有效 CC，NR1 的 <code>NR13：QTZD in {MCC, CC}</code> 成立；如果 EX_45 含有 C49.503，这一条其他诊断就不能使 NR13 成立。单独只有 C49.503 时落入 NR15。</p>
+            <p>多诊断例子：<code>J18.000</code> 主诊断下，<code>N39.000</code> 是 CC（对应 EX_88），<code>N17.900</code> 是 MCC（对应 EX_86）。两条都要分别与主诊断检查排除；本例均有效。ES4 下先试 ES41 的 MCC 条件，命中后结果为 ES41，即使 N39.000 排在输入的第二条，也不会停在 ES43。其他诊断不是只能输入一条，费用也不随条数相加。</p>
+            <p class="flow-small">界面在添加编码时显示的 CC/MCC 红色标记，只说明该编码在 CC 表中有类型；本病例是否有效还需结合主诊断与排除表判断。</p>
+          </section>
+          <section class="flow-card" id="drg-surgery">
+            <span class="flow-index">07 · 手术／操作与主次</span>
+            <h2>操作可先改变 MDC，再改变 ADRG；顺序也可能改变结果</h2>
+            <p><code>ZYSS</code> 是第一条主操作，<code>QTSS</code> 是其余操作。规则中的 <code>OP_</code> 指集合表里的手术／操作编码集合。<code>ZYSS in OP_AH3</code> 就取完整编号 OP_AH3 的操作编码，判断主操作是否在其中；不是拿主诊断去查 OP，也不是只比较 OP 编号的前缀。有些规则明确允许其他操作参与，须按规则原文处理。</p>
+            <p>以 <code>J18.000</code> 为主诊断、主操作 <code>96.7201</code>、次操作 <code>33.2400x001</code> 为例：主操作命中先期分组 MDCA 下的 <code>AH3：ZYSS in OP_AH3</code>，得到 <code>MDCA → AH3 → AH39</code>。交换主次后，先期 AH3 不再由主操作命中，病例按呼吸系统 MDC 判断，在 MDCE 下主操作命中 <code>EK3：ZYSS in OP_EK3</code>，得到 <code>MDCE → EK3 → EK35</code>。两例已与原网站实测结果核对。</p>
+            <p>因此不能只看“病例里是否出现过某个操作”，还要读规则写的是主操作还是其他操作。录入顺序应与真实病案一致。</p>
+          </section>
+          <section class="flow-card" id="drg-fee">
+            <span class="flow-index">08 · 参考权重与费用</span>
+            <h2>最终 DRG 编码定位一条参考数据</h2>
+            <ol class="flow-chain">
+              <li>MDC、ADRG、DRG 都确定之后，拿<strong>最终 DRG 编码</strong>（如 NR13、NR15、ES41）查参考数据。不能用 MDC 或 ADRG 编码代替。</li>
+              <li>当前 DRG 模式对应方案标识 <code>chs_drg_30</code>，选定 CHS-DRG 3.0 参考表；原测试网站此方案的参考数据位于 <code>1358.6bc7fb89.js</code>。本 Demo 已将这份数据导出到本地规则快照，运行时按 DRG 编码精确定位该行，不逐个遍历其他版本的 JS 文件。</li>
+              <li>显示该行的病组名称、参考权重、参考费用。比如 <code>NR15 → 0.8233 / 8,023.82 元</code>，<code>NR13 → 1.1906 / 11,603.87 元</code>。参考费用直接取表中金额，不把每条诊断或操作各算一笔后相加。</li>
+              <li>这份参考表共有 825 个病组，其中 7 个没有权重和费用；分组结果仍可成立，缺失字段显示“暂无参考数据”。若最终 DRG 在参考表中没有对应行，也不能自行估算金额。</li>
+            </ol>
+            <p>显示权重一般只有四位小数，乘以约 9,746.40 元只能近似核对表中费用，不能保证分角完全相等；这个近似数值也不是全国统一基准费率。页面的“参考费用”不等于实际医保结算款。</p>
+          </section>
+          <section class="flow-card" id="drg-walkthrough">
+            <span class="flow-index">09 · 完整演算</span>
+            <h2>从同一主诊断走完两条实际路径</h2>
+            <h3>例 A：C49.503，女，30 岁，没有其他诊断或操作</h3>
+            <ol class="flow-chain">
+              <li>录入第一条诊断 C49.503，得到 <code>ZYZD=C49.503</code>；没有 QTZD、ZYSS、QTSS；性别女映射为 <code>XB=2</code>。</li>
+              <li>按 MDC 顺序先试先期、新生儿、创伤及前面的普通大类。到 MDCM 时，尽管 C49.503 也在 DI_M00 中，<code>XB=1</code> 不成立；到 MDCN 时，<code>ZYZD in DI_N00</code> 和 <code>XB=2</code> 同时成立，得到 <code>MDCN</code>。</li>
+              <li>仅在 MDCN 的 ADRG 行中试规则。C49.503 属于 DI_NR1，<code>NR1：ZYZD in DI_NR1</code> 成立，得到 <code>NR1</code>。</li>
+              <li>仅在 NR1 的 DRG 行中先试 <code>NR13：QTZD in {MCC, CC}</code>；没有其他诊断，条件为假。继续到无条件末档 NR15，得到 <code>MDCN → NR1 → NR15</code>。</li>
+              <li>用 NR15 查 CHS-DRG 3.0 参考表，显示权重 <code>0.8233</code>、参考费用 <code>8,023.82 元</code>。</li>
+            </ol>
+            <h3>例 B：在例 A 后面再加 I50.900x001</h3>
+            <ol class="flow-chain">
+              <li>第一条 C49.503 仍是主诊断，第二条 I50.900x001 成为 QTZD；MDCN 和 ADRG NR1 不因输入顺序改变。</li>
+              <li>NR13 要求 QTZD 中有有效 MCC 或 CC。按 I50.900x001 查 CC 表：类型 CC、排除编号 EX_45；再按 EX_45 查排除表，并检查主诊断 C49.503 是否在其中。本例不在，因此 CC 有效。</li>
+              <li>NR13 条件成立，得到 <code>MDCN → NR1 → NR13</code>；查 NR13 参考行，显示权重 <code>1.1906</code>、参考费用 <code>11,603.87 元</code>。金额变化的原因是最终 DRG 从 NR15 变为 NR13，而不是多加了一条诊断的单独费用。</li>
+            </ol>
+          </section>
+          <section class="flow-card" id="drg-pitfalls">
+            <span class="flow-index">10 · 易错与易混淆</span>
+            <h2>判断时需要分清的几个位置</h2>
+            <ol class="flow-chain">
+              <li><strong>集合编号由规则指定。</strong><code>DI_</code> 是诊断集合，<code>OP_</code> 是手术／操作集合。<code>DI_B00</code> 按完整集合编号取数，不能只按 <code>DI_B</code> 前缀取一组集合，也不能拿 <code>OP_</code> 集合判断主诊断；同一诊断编码可出现在多个诊断集合。</li>
+              <li><strong>不要跳过先期分组。</strong>MDCA 可以凭主操作先命中，因而同一主诊断有无特殊操作、主次顺序不同，都可能走到不同 MDC。</li>
+              <li><strong>不要跨层找规则。</strong>已得到 MDC 后，只查所属 ADRG；已得到 ADRG 后，只查所属 DRG。每层以表内排序和首个满足条件的行决定结果。</li>
+              <li><strong>CC 标记还要经过排除表。</strong>CC 表给出其他诊断的类型及排除编号；主诊断若在对应排除集合中，这条其他诊断不触发该 CC/MCC 条件。</li>
+              <li><strong>不能看到第一个 CC 就停止。</strong>后续 MCC 可能命中更优先的 DRG 规则。</li>
+              <li><strong>性别、年龄、体重作用不同。</strong>工作簿中显式使用性别 XB 的 MDC 规则是 MDCM 和 MDCN；年龄和入院体重还可改变儿科、新生儿等组别。入院体重单位已标为 g，输入时只写数字。</li>
+              <li><strong>费用查表在分组之后。</strong>先得到最终 DRG，再查权重和费用；没有参考数据时保持空缺提示，不自行估算。</li>
+            </ol>
+          </section>
+          <section class="flow-card" id="drg-cases">
+            <span class="flow-index">11 · 实测病例</span>
+            <h2>六例输入与原网站结果</h2>
+            <p>统一条件：男、30 岁、住院 15 天、医嘱离院。诊断和操作编码均按输入顺序排列。</p>
+            <div class="flow-table-wrap"><table class="flow-table"><thead><tr><th>诊断</th><th>操作</th><th>DRG</th><th>权重</th><th>参考费用</th></tr></thead><tbody>
+              <tr><td>J18.000</td><td>无</td><td>ES45</td><td>0.3954</td><td>3,854.10 元</td></tr>
+              <tr><td>J18.000；N39.000</td><td>无</td><td>ES43</td><td>0.6181</td><td>6,024.52 元</td></tr>
+              <tr><td>J18.000；N17.900</td><td>无</td><td>ES41</td><td>0.9769</td><td>9,521.40 元</td></tr>
+              <tr><td>J18.000；N39.000；N17.900</td><td>无</td><td>ES41</td><td>0.9769</td><td>9,521.40 元</td></tr>
+              <tr><td>J18.000</td><td>96.7201；33.2400x001</td><td>AH39</td><td>7.0137</td><td>68,357.89 元</td></tr>
+              <tr><td>J18.000</td><td>33.2400x001；96.7201</td><td>EK35</td><td>0.9525</td><td>9,283.72 元</td></tr>
+            </tbody></table></div>
+          </section>
+        </div>
+        </div>
       </main>
     </div>
+    <script src="./flow.js" defer></script>
   </body>
 </html>

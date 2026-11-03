@@ -36,3 +36,11 @@
 .flow-small{font-size:12px!important;color:#788999!important}
 @media(max-width:990px){.intro-side{align-items:flex-end;flex-direction:column}.flow-workspace{padding-top:32px}}
 @media(max-width:600px){.intro-side{align-items:flex-start}.flow-workspace h1{font-size:25px}.flow-lead{font-size:13px}.flow-card{padding:22px 18px}.flow-card h2{font-size:18px}.flow-grid{grid-template-columns:1fr}.flow-callout{display:block}.flow-callout strong{display:block;margin-bottom:4px}.flow-diagram-wrap{padding:14px 12px}.flow-diagram{font-size:12px}.topbar-link{font-size:11px}}
+.flow-mode-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:24px}
+.flow-mode-row .mode-switch{margin:0}
+.flow-mode-row>span{font-size:12px;color:#8795a6}
+#flow-book{transform-style:preserve-3d;transform-origin:left center;backface-visibility:hidden}
+#flow-book.page-turn-out{animation:page-turn-out .24s ease-in both}
+#flow-book.page-turn-in{animation:page-turn-in .38s cubic-bezier(.2,.7,.2,1) both}
+@media(max-width:600px){.flow-mode-row{align-items:flex-start;flex-direction:column}.flow-mode-row .mode-switch{width:100%}.flow-mode-row .mode-button{flex:1}}
+@media(prefers-reduced-motion:reduce){#flow-book.page-turn-out,#flow-book.page-turn-in{animation:none}}

@@ -1,22 +1,27 @@
-"""Local HTTP server for the DIP 3.0 demo. No third-party packages needed."""
+"""Local HTTP server for the DIP and CHS-DRG 3.0 rule demos."""
 
 from __future__ import annotations
 
 import argparse
 import json
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
+from drg_grouping import catalog as drg_catalog
+from drg_grouping import group_case as drg_group_case
+from drg_grouping import search_catalog
 from grouping import ROOT, catalog, group_case, load_rules
 
 PUBLIC_FILES = {
     "/", "/index.html", "/flow.html", "/styles.css", "/flow.css",
     "/app.js", "/assets/pku-logo.png",
+    "/flow.js",
 }
 
 
 class DemoHandler(SimpleHTTPRequestHandler):
     rules = load_rules()
     suggestions = catalog(rules)
+    drg_summary = drg_catalog()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
@@ -31,9 +36,21 @@ class DemoHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if self.path == "/api/catalog":
-            self._json(200, self.suggestions)
-        elif self.path.startswith("/api/"):
+        route = urlsplit(self.path)
+        params = parse_qs(route.query)
+        if route.path == "/api/catalog":
+            self._json(200, self.drg_summary if params.get("mode") == ["drg"] else self.suggestions)
+        elif route.path == "/api/search":
+            if params.get("mode") != ["drg"]:
+                self._json(400, {"error": "仅 DRG 模式使用此查询接口"})
+                return
+            kind = params.get("kind", [""])[0]
+            if kind not in ("dx", "op"):
+                self._json(400, {"error": "kind 必须是 dx 或 op"})
+                return
+            query = params.get("q", [""])[0][:100]
+            self._json(200, {"suggestions": search_catalog(kind, query)})
+        elif route.path.startswith("/api/"):
             self._json(404, {"error": "接口不存在"})
         elif urlsplit(self.path).path in PUBLIC_FILES:
             super().do_GET()
@@ -67,18 +84,24 @@ class DemoHandler(SimpleHTTPRequestHandler):
                                        len(payload[key]) > 100 or
                                        any(not isinstance(code, str) or len(code) > 100 for code in payload[key])):
                     raise ValueError(f"{key} 必须是编码列表")
-            self._json(200, group_case(self.rules, payload))
+            mode = payload.get("mode", "dip")
+            if mode == "drg":
+                self._json(200, drg_group_case(payload))
+            elif mode == "dip":
+                self._json(200, group_case(self.rules, payload))
+            else:
+                raise ValueError("mode 必须是 dip 或 drg")
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self._json(400, {"error": str(exc)})
 
 
 def main():
-    parser = argparse.ArgumentParser(description="DIP 3.0 病种分组演示服务")
+    parser = argparse.ArgumentParser(description="DIP / DRG 3.0 分组演示服务")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     server = ThreadingHTTPServer((args.host, args.port), DemoHandler)
-    print(f"DIP 3.0 demo: http://{args.host}:{args.port}/", flush=True)
+    print(f"DIP / DRG 3.0 demo: http://{args.host}:{args.port}/", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
