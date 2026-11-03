@@ -12,7 +12,6 @@
 DIP_Demo/
 ├── .gitignore                                      忽略 Python 缓存文件
 ├── README.md                                       项目说明、DIP/DRG 流程与运行方法
-├── package.json                                    npm test 命令入口（实际测试由 Python 执行）
 ├── start-demo.cmd                                  Windows 前台启动脚本
 ├── restart-demo.ps1                                Windows 后台重启及 DRG 接口检查
 ├── server.py                                       本地 HTTP 服务、页面与分组接口
@@ -37,14 +36,10 @@ DIP_Demo/
 │   └── images/
 │       ├── homepage.png                            首页预览图
 │       └── drg.png                                 DRG 分组结果预览图
-├── scripts/
-│   ├── export_rules.py                             从 DIP 工作簿重新生成 rules.json
-│   ├── export_drg_rules.py                         从 DRG 工作簿和参考表生成 drg_rules.json
-│   └── prepare-demo-start.ps1                      启动前检测并处理旧版 8765 服务
-└── tests/
-    ├── test_grouping.py                            DIP 规则单元测试
-    ├── test_drg_grouping.py                        DRG 分组与边界案例测试
-    └── test_api.py                                 HTTP 接口及静态文件测试
+└── scripts/
+    ├── export_rules.py                             从 DIP 工作簿重新生成 rules.json
+    ├── export_drg_rules.py                         从 DRG 工作簿和参考表生成 drg_rules.json
+    └── prepare-demo-start.ps1                      启动前检测并处理旧版 8765 服务
 ```
 
 ## 首页预览
@@ -83,12 +78,6 @@ python server.py
 
 ```bash
 python server.py --host 0.0.0.0 --port 8765
-```
-
-运行检查：
-
-```bash
-python -m unittest discover -s tests -v
 ```
 
 ## DIP 分组匹配流程
