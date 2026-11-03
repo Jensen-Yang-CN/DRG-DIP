@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>分组匹配流程 · DIP 3.0 病种分组演示系统</title>
+    <link rel="stylesheet" href="./styles.css?v=explorer-1" />
+    <link rel="stylesheet" href="./flow.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <img
+            class="brand-logo"
+            src="./assets/pku-logo.png"
+            width="48"
+            height="48"
+            alt="北京大学校徽"
+          />
+          <div>
+            <strong>北武院 DIP 病种分组演示系统</strong
+            ><small>当前规则：全国版 DIP 3.0</small>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <a class="topbar-link" href="./index.html">返回分组页面 →</a>
+        </div>
+      </header>
+
+      <main class="workspace flow-workspace">
+        <div class="eyebrow">CHS-DIP · 3.0</div>
+        <h1>分组匹配流程</h1>
+        <p class="flow-lead">
+          从输入到结果的实际判断顺序如下；各步骤的解释和测试案例在流程图下方。
+        </p>
+
+        <section class="flow-card" id="overview">
+          <span class="flow-index">01 · 总览</span>
+          <h2>点击“执行分组”后，数据依次经过这些判断</h2>
+          <div class="flow-diagram-wrap">
+            <pre class="flow-diagram">
+点击「执行分组」
+  ↓
+确定主诊断、其他诊断、主操作、其他操作
+  ↓
+主诊断是否在「五、不纳入分组的主要诊断」？
+  ├─ 是 → 停止，显示「不纳入分组」；例：J18.800
+  └─ 否
+       ↓
+     主操作是否在「五、不纳入分组的主要手术操作」？
+     （主操作若在排除表中，则按表里的说明处理：可能禁止作为主操作，也可能忽略其主操作作用，继续尝试分组。1、2、3分别对应表里的“说明”内容）
+       ├─ 1、按保守治疗 → 忽略主操作，继续
+       │  例：J18.900 + 主操作 17.91350 → JC-3414
+       │  再加其他操作 96.7201 → XQ-14；不保证命中 JC
+       ├─ 2、不可作主操作 → 停止，提示调整
+       │  例：J18.900 + 主操作 00.3101 → 需要核对输入
+       ├─ 3、有诊断例外 → 符合继续，否则停止
+       │  例：K29.700 + 44.1300x001 → BX-903（符合）
+       │      J18.900 + 44.1300x001 → 停止（不符合）
+       └─ 4、未命中该操作表/未填写 → 原样或无主操作继续
+          例：J18.900 + 33.2402 → BX-774；仅 J18.900 → JC-3414
+       ↓
+     依次查：先期 XQ → 辅助细分 FZ → 并项 BX → 基础 JC
+       ├─ 命中 → 选该级一条，停止向后查
+       └─ 全部未命中 → 显示「未命中核心规则」
+       ↓（仅已命中时）
+     查「六、基层病种」，符合则附加标识
+       ↓
+     展示分类、序号、名称、来源表和路径</pre
+            >
+          </div>
+          <p class="flow-overview-note">
+            注意：“主操作出现在第五部分”不等于病例立即停止；必须读取该行的“说明”。第五部分是入组前的资格与操作处理，XQ、FZ、BX、JC
+            才是本 Demo 实际查找核心病种的四级规则。
+          </p>
+        </section>
+
+        <nav class="flow-nav" aria-label="页面目录">
+          <a href="#overview">流程总览</a><a href="#inputs">输入与编码</a
+          ><a href="#matching">编码与符号</a
+          ><a href="#part-five">第五部分的两张表</a
+          ><a href="#core">四级核心规则</a><a href="#grassroots">基层病种</a
+          ><a href="#outputs">结果含义</a><a href="#examples">逐例核对</a>
+        </nav>
+
+        <section class="flow-card" id="inputs">
+          <span class="flow-index">02 · 输入与编码</span>
+          <h2>列表顺序决定“主”和“其他”</h2>
+          <p>
+            开发时运行 <code>scripts/export_rules.py</code>，把工作簿中 10
+            个工作表的规则及原行号导出到 <code>data/rules.json</code>。Python
+            服务启动时加载这份规则快照；浏览器点击“执行分组”后，请求
+            <code>/api/group</code>，由
+            <code>grouping.py</code> 执行匹配并返回结果和路径。<strong
+              >不会每点击一次就重新打开 Excel 文件</strong
+            >。
+          </p>
+          <div class="flow-grid">
+            <div>
+              <h3>诊断</h3>
+              <p>
+                第一个编码是主诊断，必须填写；后续编码是其他诊断。其他诊断只在需要它们的规则中参与判断，例如部分肿瘤、烧伤与结核辅助细分规则。
+              </p>
+            </div>
+            <div>
+              <h3>手术与操作</h3>
+              <p>
+                可以不填。第一个编码是主操作，后续编码是其他操作。某些先期分组可以使用其他操作；并项规则还可能要求特定的相关操作。
+              </p>
+            </div>
+          </div>
+          <p>
+            程序去除编码空格并统一字母大小写。<code>J18.900</code>
+            可以匹配核心规则中较粗的 <code>J18</code> 或基层目录中的
+            <code>J18.9</code
+            >；但主诊断排除表采用<strong>完整编码精确比较</strong>，不会因为
+            <code>J18.800</code> 被排除就把
+            <code>J18.900</code>
+            也排除。前端显示的中文名称用于选择与阅读，不代替编码规则匹配。
+          </p>
+          <div class="flow-matching" id="matching">
+            <h3>
+              规则里的 <code>|</code>、<code>+</code> 和“粗匹配”是什么意思？
+            </h3>
+            <div class="flow-grid">
+              <div>
+                <h3><code>|</code>：任选其一</h3>
+                <p>
+                  例如主要操作规则
+                  <code>33.2400x001|33.2402</code
+                  >：主操作是其中一个编码即可，不要求两个都有。
+                </p>
+              </div>
+              <div>
+                <h3><code>+</code>：必须同时具备</h3>
+                <p>
+                  例如 <code>99.2503+99.2800x005</code>：主操作应为
+                  <code>99.2503</code>，还需录入相关操作
+                  <code>99.2800x005</code
+                  >。这表示病例同时具备两项操作编码，不表示必须在同一时刻实施。
+                </p>
+              </div>
+            </div>
+            <p>
+              两种符号同时出现时，先把
+              <code>+</code> 连起来的一组看作“都要有”，再用
+              <code>|</code> 分隔备选组。例如 <code>A+B|C</code> 表示“同时有
+              A、B”或“有
+              C”。在主要操作列中，每个备选组的第一个编码须由主操作满足。
+            </p>
+            <p>
+              <strong>诊断的粗匹配：</strong>当前 Demo 对规则端不超过 5
+              个字符的诊断编码（如
+              <code>J18</code>、<code>Z51.1</code>）按前缀匹配。因此规则写
+              <code>J18</code> 可匹配输入 <code>J18.900</code>；规则写
+              <code>Z51.1</code> 可匹配 <code>Z51.101</code> 或
+              <code>Z51.102</code>。规则写
+              <code>C00-C75</code> 时，按三位类目范围判断，例如
+              <code>C34.901</code> 落在该范围内。
+            </p>
+            <p>
+              <strong>哪些地方必须完整一致：</strong
+              >“五”的主诊断表和主操作表在查找输入编码时都使用完整编码；核心规则中的手术操作编码也完整匹配，例如
+              <code>99.2800x005</code> 不等于
+              <code>99.2800x006</code
+              >。若主操作命中“五”的表，其“说明”列另有诊断例外范围，还需按说明判断。核心规则若写了较长的完整诊断编码，也不会仅凭前几位相同就匹配。
+            </p>
+            <p class="flow-small">
+              以上是本 Demo
+              的编码匹配方式。“粗匹配”不是任意忽略末尾数字；输入编码必须完整包含规则所写的较粗诊断编码前缀。
+            </p>
+          </div>
+          <p>
+            性别、年龄（岁）和住院天数目前不参与这份 Demo
+            的核心规则判断。新生儿先期分组会读取<strong>出生天龄与出生体重</strong>；年龄填
+            0 岁时，页面才显示天龄输入。
+          </p>
+        </section>
+
+        <section class="flow-card" id="part-five">
+          <span class="flow-index">03 · 第五部分</span>
+          <h2>“不纳入分组”两张表，处理方法并不相同</h2>
+          <p>
+            <strong>主诊断表：</strong
+            >只查输入的第一项主诊断。完整编码命中时，Demo
+            显示“不纳入分组”并停止。例如 <code>J18.800</code> 在这张表第 982
+            行。这里的“不纳入”是指当前输入不能继续按该主诊断匹配本 Demo 的国家
+            3.0 核心规则，不是一个新的分组名称。
+          </p>
+          <p>
+            <strong>主操作表：</strong
+            >只查输入的第一项主操作。查到编码后必须阅读同一行的“说明”列：
+          </p>
+          <div class="flow-table-wrap">
+            <table class="flow-table">
+              <thead>
+                <tr>
+                  <th>说明列 / 情况</th>
+                  <th>当前 Demo 的处理</th>
+                  <th>例子</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>未查到主操作</td>
+                  <td>原样保留主操作，继续四级核心规则。</td>
+                  <td><code>J18.900 + 33.2402</code> → BX-774</td>
+                </tr>
+                <tr>
+                  <td>按保守治疗入组</td>
+                  <td>
+                    忽略该编码<strong>作为主操作</strong>的分组作用，继续依次尝试
+                    XQ → FZ → BX → JC。<strong>不保证最终命中 JC。</strong
+                    >其他操作仍可能满足先期分组。
+                  </td>
+                  <td>
+                    <code>J18.900 + 17.91350</code> → JC-3414；再添加其他操作
+                    <code>96.7201</code> → XQ-14
+                  </td>
+                </tr>
+                <tr>
+                  <td>不可作为主要手术操作</td>
+                  <td>停止，提示调整主操作；不会自动把它改为保守治疗。</td>
+                  <td><code>J18.900 + 00.3101</code> → 需要核对输入</td>
+                </tr>
+                <tr>
+                  <td>指定主诊断时可作为主操作</td>
+                  <td>
+                    先检查主诊断是否落在说明列给定范围。符合则保留该主操作并继续四级规则；不符合则停止。<strong
+                      >放行本身不保证命中核心规则。</strong
+                    >
+                  </td>
+                  <td>
+                    <code>K29.700 + 44.1300x001</code> → BX-903；<code
+                      >J18.900 + 44.1300x001</code
+                    >
+                    → 停止
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="flow-callout">
+            <strong>容易混淆的例子</strong
+            ><span
+              ><code>K29.700</code> 不在主诊断排除表。<code>44.1300x001</code>
+              虽在主操作表第 1274 行，但说明列允许
+              <code>K20-K93</code> 范围的主诊断使用它；<code>K29.700</code>
+              符合，所以并未被排除，随后才命中 BX-903。</span
+            >
+          </div>
+        </section>
+
+        <section class="flow-card" id="core">
+          <span class="flow-index">04 · 四级核心规则</span>
+          <h2>从特殊规则到基础规则，逐级检查整行条件</h2>
+          <p>
+            每一级都会找出<strong>主诊断、其他诊断、主操作、相关操作及特殊条件同时满足</strong>的候选行。某一级已有候选，就在该级选一条展示，并停止查后续级别。同一级有多条候选时，Demo
+            优先选实际满足条件项数最多的规则：主诊断、其他诊断、每项必需操作及特殊条件分别计数；<code>|</code> 只计算实际满足的分支。
+            条件项数相同才沿用原有排序分数，再按较小序号取舍。其他候选按相同顺序展示。这是 Demo 的实现选择。
+          </p>
+          <div class="flow-table-wrap">
+            <table class="flow-table">
+              <thead>
+                <tr>
+                  <th>顺序</th>
+                  <th>工作表</th>
+                  <th>具体检查</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1 · XQ</td>
+                  <td>一、先期分组</td>
+                  <td>
+                    移植、ECMO、长时呼吸机等特殊操作，或新生儿诊断＋天龄＋出生体重。表中写明“不限定为主要操作”的规则可用其他操作命中。
+                  </td>
+                </tr>
+                <tr>
+                  <td>2 · FZ</td>
+                  <td>三、诊断辅助细分：烧伤、肿瘤、结核；结核耐药诊断附表</td>
+                  <td>
+                    除主诊断外，按对应子表检查其他诊断、主操作、相关操作或结核耐药状态。
+                  </td>
+                </tr>
+                <tr>
+                  <td>3 · BX</td>
+                  <td>二、并项规则下的核心病种</td>
+                  <td>
+                    主诊断匹配，该行列出的可选主要操作包含当前有效主操作；若还有相关操作条件，也必须满足。
+                  </td>
+                </tr>
+                <tr>
+                  <td>4 · JC</td>
+                  <td>四、基础规则下的核心病种</td>
+                  <td>
+                    主诊断匹配；若规则指定主操作，主操作也要匹配；若该行主操作为空，当前路径须无有效主操作。
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            每行中的操作备选、联合操作及诊断编码粒度，按上方的<a
+              href="#matching"
+              >编码与符号说明</a
+            >判断。
+          </p>
+        </section>
+
+        <section class="flow-card" id="grassroots">
+          <span class="flow-index">05 · 第六部分</span>
+          <h2>基层病种是附加目录标识</h2>
+          <p>
+            选定核心规则后，Demo
+            再检查“六、基层病种”的主诊断和操作路径。符合时显示“基层病种·第 N
+            项”，<strong>不会把 BX 或 JC 结果改写成另一个分组</strong>。例如
+            <code>J18.900</code> 走无有效主操作的 JC-3414 路径，可附加基层病种第
+            38 项；<code>J18.900 + 33.2402</code> 走
+            BX-774，不附加这一保守治疗标识。先期分组不继承保守治疗的基层标识。
+          </p>
+        </section>
+
+        <section class="flow-card" id="outputs">
+          <span class="flow-index">06 · 最终结果</span>
+          <h2>页面显示的是“命中的规则行”及其检查依据</h2>
+          <div class="flow-table-wrap">
+            <table class="flow-table">
+              <thead>
+                <tr>
+                  <th>结果</th>
+                  <th>含义</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>BX-774</code>、<code>JC-3414</code> 等</td>
+                  <td>
+                    “规则分类＋表内序号”的定位标识，可以回到原 Excel
+                    对应行核查；并非另行公布的完整 DIP 病种编码。
+                  </td>
+                </tr>
+                <tr>
+                  <td>不纳入分组</td>
+                  <td>
+                    主诊断完整编码命中第五部分的主诊断表，已停止后续核心规则匹配。
+                  </td>
+                </tr>
+                <tr>
+                  <td>需要核对输入</td>
+                  <td>
+                    主操作在当前情况下不可作为主要操作，或其附条件许可未满足，已停止后续匹配。
+                  </td>
+                </tr>
+                <tr>
+                  <td>未命中核心规则</td>
+                  <td>
+                    四级规则均无完整匹配。本工作簿未提供完整综合病种目录，Demo
+                    不会据此自动宣称“综合病种”或生成分值。
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="flow-card" id="examples">
+          <span class="flow-index">07 · 逐例核对</span>
+          <h2>用这六组输入逐步验证</h2>
+          <div class="flow-table-wrap">
+            <table class="flow-table">
+              <thead>
+                <tr>
+                  <th>主诊断</th>
+                  <th>主操作 / 其他操作</th>
+                  <th>先经过第五部分</th>
+                  <th>最终结果</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>J18.900</code></td>
+                  <td><code>33.2402</code></td>
+                  <td>主诊断与主操作均未被阻断</td>
+                  <td>BX-774，并项表第 757 行</td>
+                </tr>
+                <tr>
+                  <td><code>J18.900</code></td>
+                  <td><code>17.91350</code></td>
+                  <td>主操作按保守治疗处理</td>
+                  <td>JC-3414，基础表第 1559 行</td>
+                </tr>
+                <tr>
+                  <td><code>J18.900</code></td>
+                  <td><code>17.91350</code> / <code>96.7201</code></td>
+                  <td>主操作按保守治疗处理；其他操作仍参与 XQ</td>
+                  <td>XQ-14，先期表第 17 行</td>
+                </tr>
+                <tr>
+                  <td><code>J18.900</code></td>
+                  <td><code>00.3101</code></td>
+                  <td>该编码不可作为主操作</td>
+                  <td>停止，需核对输入</td>
+                </tr>
+                <tr>
+                  <td><code>J18.900</code></td>
+                  <td><code>44.1300x001</code></td>
+                  <td>主诊断不在该操作允许范围</td>
+                  <td>停止，需核对输入</td>
+                </tr>
+                <tr>
+                  <td><code>K29.700</code></td>
+                  <td><code>44.1300x001</code></td>
+                  <td>主诊断在允许范围，操作放行</td>
+                  <td>BX-903，并项表第 886 行</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="flow-small">
+            辅助细分也可验证：主诊断 <code>Z51.101</code>、其他诊断
+            <code>C34.901</code>、主操作 <code>99.2503</code> 命中
+            FZ-1770；再添加其他操作 <code>99.2800x005</code>，可命中条件更具体的
+            FZ-1771。
+          </p>
+          <p class="flow-small">
+            另可测试 <code>J18.800 + 17.91350</code>：主诊断先命中第五部分第 982
+            行，立即显示“不纳入分组”，不会继续处理主操作。
+          </p>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

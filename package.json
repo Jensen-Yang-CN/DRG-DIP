@@ -1,0 +1,7 @@
+{
+  "name": "dip-3-demo",
+  "private": true,
+  "scripts": {
+    "test": "python -m unittest discover -s tests -v"
+  }
+}
