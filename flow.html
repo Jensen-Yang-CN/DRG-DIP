@@ -447,26 +447,35 @@
           <section class="flow-card" id="drg-overview">
             <span class="flow-index">01 · 总览</span>
             <h2>从病例输入到参考费用</h2>
-            <div class="flow-diagram-wrap"><pre class="flow-diagram">输入病例 → 第一条诊断=ZYZD，其余=QTZD；第一条操作=ZYSS，其余=QTSS
-         → 性别=XB，年龄=NL，天龄=XSRTL，入院体重=XSRTZ
+            <div class="flow-diagram-wrap"><pre class="flow-diagram">输入病例：第一条诊断=ZYZD，其余=QTZD；第一条操作=ZYSS，其余=QTSS
+          性别=XB，年龄=NL，天龄=XSRTL，入院体重=XSRTZ
   ↓
-按 MDC 表排序试规则：MDCA 先期分组 → MDCP 新生儿 → MDCZ 创伤 → 其他 MDC
-  ↓  每条规则写明要查的集合：如 ZYZD in DI_M00，就直接查 DI_M00 是否包含主诊断
-     不先找出主诊断所属的所有集合，也不按“集合”表行顺序挑第一个
-     条件不成立继续下一条；成立则确定 MDC，停止本层查找
+按 MDC 表顺序检查：MDCA 先期 → MDCP 新生儿 → MDCZ 创伤 → 其他 MDC
+  ├─ MDCA 下的特殊 ADRG 命中 → 同时确定 MDCA 和 ADRG，进入 DRG 层
+  └─ 未命中先期分组 → 继续逐条检查其余 MDC
+       每条规则按自己写明的集合判断；如 ZYZD in DI_M00，就只查 DI_M00
+       不先扫描“集合”表找主诊断所属的全部集合，也不按集合表行顺序挑第一个
+       ├─ 当前规则不成立 → 试下一条 MDC
+       ├─ 成立 → 确定 MDC，停止本层查找
+       └─ 全部不成立 → MDC 未命中，停止
+  ↓（尚未由 MDCA 确定 ADRG 时）
+只取已确定 MDC 的 ADRG 行，按表内顺序判断
+  如 ZYZD in DI_MR1，就用同一个主诊断再查 DI_MR1
+  ├─ 首条满足条件 → 确定 ADRG
+  └─ 全部不成立 → ADRG 未命中，停止
   ↓
- 只取该 MDC 的 ADRG 行；如 ZYZD in DI_MR1，就用同一个主诊断再查 DI_MR1
-     按排序试诊断／操作／年龄等条件 → 首个命中 ADRG
+只取已确定 ADRG 的 DRG 行，按表内顺序判断
+  ├─ 当前规则不涉及 CC/MCC → 直接判断该行写明的其他条件
+  └─ 遇到 QTZD in CC/MCC → 逐条检查其他诊断
+       ├─ 类型不符或被排除 → 试下一条其他诊断
+       ├─ 类型符合且未被排除 → 可使当前 CC/MCC 条件成立
+       └─ 全部无效 → 当前条件不成立，试下一条 DRG
   ↓
-只取该 ADRG 的 DRG 行，按排序逐条试条件
-  ↓  遇到 QTZD in CC/MCC：逐条取其他诊断，用完整编码查 CC 表
-     读取类型与该诊断对应的排除表编号 → 查排除集合中是否包含本病例主诊断
-     包含 → 该其他诊断不触发 CC/MCC；不包含 → 可作为有效 CC/MCC
-     所有其他诊断均不能使当前条件成立 → 继续下一条 DRG
-  ↓
-首个命中 DRG（无条件末档可承接）→ 用最终 DRG 编码查本方案参考表
-  ↓
-显示 DRG 名称、参考权重、参考费用；缺少表值时显示“暂无参考数据”</pre></div>
+检查当前 ADRG 下的 DRG 结果（无条件末档可承接）
+  ├─ 未命中 → 显示未能完成分组
+  └─ 已命中 → 用最终 DRG 编码查本方案参考表
+       ├─ 有参考值 → 显示 DRG 名称、参考权重、参考费用
+       └─ 缺少参考值 → 病组仍成立，显示“暂无参考数据”</pre></div>
             <p class="flow-overview-note">规则来自项目内 CHS-DRG 3.0 配置工作簿的 MDC、ADRG、DRG、集合、CC 和排除表六张工作表。“集合”表中 <code>DI_</code> 是诊断编码集合，<code>OP_</code> 是手术／操作编码集合。运行时读取预先导出的快照，不逐次打开 Excel。</p>
           </section>
           <nav class="flow-nav" aria-label="DRG 流程目录">
@@ -518,24 +527,21 @@
             <span class="flow-index">06 · CC/MCC 与排除</span>
             <h2>其他诊断先查类型，再查它自己的排除表</h2>
             <div class="flow-diagram-wrap"><pre class="flow-diagram">当前 DRG 规则要求 QTZD in CC、QTZD in MCC 或 QTZD in {MCC, CC}
-  ↓
-取一条其他诊断
-  ↓
-用其完整编码查 CC 表
-  ↓
-读取类型：CC、MCC，或不属于两者
-  ├─ 不属于两者 → 这条诊断不能触发当前 CC/MCC 条件，检查下一条其他诊断
-  └─ 属于 CC/MCC → 读取这条诊断对应的排除表编号
+  ├─ 没有其他诊断 → 当前 CC/MCC 条件不成立
+  └─ 有其他诊断 → 逐条取出，用完整编码查 CC 表
        ↓
-     按该编号找到相应排除集合
-       ↓
-     检查本病例的主要诊断是否在该排除集合中
-       ├─ 在 → 这条其他诊断在本病例中不能触发相应 CC/MCC 条件
-       │        继续检查下一条其他诊断
-       └─ 不在 → 这条其他诊断可作为有效 CC/MCC 参与当前 DRG 条件
+     读取这条诊断的类型，与当前 DRG 规则要求比较
+       ├─ 不属于 CC/MCC，或类型不符合要求 → 检查下一条其他诊断
+       └─ 类型符合 → 读取这条诊断对应的排除表编号
+            ├─ 无排除表编号 → 这条诊断不受排除表限制，可作为有效 CC/MCC
+            └─ 有排除表编号 → 取该编号对应的排除集合，检查本病例主诊断
+                 ├─ 主诊断在排除集合中 → 这条诊断在本病例中不能触发 CC/MCC
+                 │                       继续检查下一条其他诊断
+                 └─ 主诊断不在排除集合中 → 这条诊断可作为有效 CC/MCC
   ↓
-有符合当前 DRG 条件的有效其他诊断 → 当前条件成立
-否则 → 当前条件不成立，继续检查该 ADRG 下的下一条 DRG</pre></div>
+所有其他诊断检查完毕
+  ├─ 有符合当前 DRG 要求的有效 CC/MCC → 当前条件成立
+  └─ 没有 → 当前条件不成立，继续检查该 ADRG 下的下一条 DRG</pre></div>
             <ol class="flow-chain">
               <li>只有 DRG 条件要求 <code>QTZD in CC</code>、<code>QTZD in MCC</code> 或 <code>QTZD in {MCC, CC}</code> 时，CC/MCC 才会决定这条条件是否成立。CC 是一般合并症或并发症，MCC 是严重合并症或并发症。</li>
               <li>对每条候选其他诊断，以完整编码查“CC”表，读取其 CC/MCC 类型和排除表编号。没有对应 CC/MCC 类型的编码不能据此触发该条件。</li>
