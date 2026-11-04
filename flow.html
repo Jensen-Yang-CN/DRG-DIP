@@ -451,10 +451,12 @@
          → 性别=XB，年龄=NL，天龄=XSRTL，入院体重=XSRTZ
   ↓
 按 MDC 表排序试规则：MDCA 先期分组 → MDCP 新生儿 → MDCZ 创伤 → 其他 MDC
-  ↓  读到 ZYZD in DI_B00：按完整编号 DI_B00 取诊断集合，检查主诊断编码
+  ↓  每条规则写明要查的集合：如 ZYZD in DI_M00，就直接查 DI_M00 是否包含主诊断
+     不先找出主诊断所属的所有集合，也不按“集合”表行顺序挑第一个
      条件不成立继续下一条；成立则确定 MDC，停止本层查找
   ↓
-只取该 MDC 的 ADRG 行，按排序试诊断／操作／年龄等条件 → 首个命中 ADRG
+ 只取该 MDC 的 ADRG 行；如 ZYZD in DI_MR1，就用同一个主诊断再查 DI_MR1
+     按排序试诊断／操作／年龄等条件 → 首个命中 ADRG
   ↓
 只取该 ADRG 的 DRG 行，按排序逐条试条件
   ↓  遇到 QTZD in CC/MCC：逐条查 CC 表及该诊断对应的排除表
@@ -487,17 +489,17 @@
             <ol class="flow-chain">
               <li>先看 MDC 表的排序。最前面是先期分组 <code>MDCA</code>：它没有普通的主诊断集合条件，要先试 MDCA 下的 ADRG 特殊操作规则；若命中，直接得到 MDCA 和相应 ADRG。</li>
               <li>未进入 MDCA，再试 <code>MDCP</code> 新生儿规则、<code>MDCZ</code> 多发严重创伤规则等。它们会组合年龄、天龄、诊断或操作条件，不能跳过后直接从普通 DI 集合开始。</li>
-              <li>读到普通规则，如 <code>MDCB：ZYZD in DI_B00</code>，先在“集合”表按<strong>完整编号 DI_B00</strong> 取所有诊断编码，再检查主诊断编码是否属于该清单。属于则选 MDCB；不属于就试下一条 MDC。<code>I60.000</code> 是 DI_B00 中的一个实际编码。</li>
+              <li>读到普通规则，如 <code>MDCB：ZYZD in DI_B00</code>，程序直接取预先导出的 <strong>DI_B00 集合</strong>，检查主诊断编码是否在其中。属于则选 MDCB；不属于就试下一条 MDC。<code>I60.000</code> 是 DI_B00 中的一个实际编码。</li>
               <li>有 <code>and</code> 的规则要同时满足。女性大类 <code>MDCN：(ZYZD in DI_N00) and (XB = 2)</code> 既要诊断属于 DI_N00，也要性别为女；男性大类 MDCM 对应 DI_M00 与 XB=1。</li>
             </ol>
             <p>这里的 <code>DI_</code> 是诊断集合编号，<code>OP_</code> 是手术／操作集合编号。编号的前缀可辨类型，不能只看 <code>DI_B</code> 就把多个集合合并；对 <code>DI_B00</code> 的成员判断也不是一律只比较 ICD 的前四个字符。<code>ZYZD in DI_B00</code> 不会去查 OP 集合。程序以工作簿完整集合编号和编码清单为准。</p>
-            <p>一个主诊断可能同时出现在多个 DI 集合，不能先给它定一个唯一的“DI 类”。例如 <code>C49.503</code> 同时在 DI_M00、DI_N00、DI_MR1、DI_NR1 中；女患者的 MDCM 性别条件不成立，MDCN 的诊断和性别条件成立，得到 <code>MDCN</code>。确定 MDC 后只进入这个大类的 ADRG，不把所有大类的 ADRG 混在一起找。</p>
+            <p>“集合”表每一行是一对“集合编号—ICD 编码”；一个集合可包含多个编码，同一个编码也可属于多个集合。导出时程序读完整张表并按集合编号整理名单。<strong>分组时不从“集合”表第一行向下找 C49.503，也不按它出现的先后选集合。</strong>例如 <code>C49.503</code> 同时在 DI_M00、DI_N00、DI_MR1、DI_NR1 中；检查 MDCM 规则时只查它指定的 <code>DI_M00</code>，再检查 <code>XB=1</code>。男性两项都成立，才确定 MDCM；女性则可满足 MDCN 的 DI_N00 与 XB=2 条件。</p>
           </section>
           <section class="flow-card" id="drg-adrg">
             <span class="flow-index">04 · 确定 ADRG</span>
             <h2>用已确定的 MDC 缩小范围，再按 ADRG 排序匹配</h2>
             <p>ADRG 是核心病组。程序先筛出 ADRG 表中“所属 MDC”列等于当前 MDC 的行，再按该表排序逐条计算规则。条件可能写 <code>ZYZD in DI_...</code>、<code>ZYSS in OP_...</code>，也可能组合其他诊断、其他操作、天龄或体重；<code>and</code> 要全部成立，<code>or</code> 满足一支即可。未命中的行继续往下试，首个命中的行给出 ADRG 编码和名称。</p>
-            <p>例如女患者的 <code>C49.503</code> 已得到 MDCN，就只看 MDCN 下的 ADRG。该编码在 <code>DI_NR1</code> 中，满足 NR1 行的 <code>ZYZD in DI_NR1</code>，因此 ADRG 为 <code>NR1（女性生殖系统恶性肿瘤）</code>。<code>NR1</code> 来自 ADRG 表的编码列，不是从诊断编码的字符直接拼出来的。</p>
+            <p>例如男患者以 <code>C49.503</code> 命中 MDCM 后，只看 MDCM 下的 ADRG。检查 MR1 行的 <code>ZYZD in DI_MR1</code> 时，仍用<strong>原来的主诊断 C49.503</strong>，直接判断它是否在规则指定的 DI_MR1 集合中；属于则得到 <code>MR1</code>。这和 MDC 阶段查 DI_M00 是同一个成员判断，只是两条规则指定的集合不同。女患者若已得到 MDCN，则只看 MDCN 下的 ADRG，以同样方式检查 <code>ZYZD in DI_NR1</code>，可得到 <code>NR1</code>。集合编号不是从诊断编码中推算出来的。</p>
             <p>再如 <code>J18.000</code> 在普通呼吸系统大类 MDCE 内，满足 <code>ES4：ZYZD in DI_ES4</code>，因此无更优先手术规则时得到 ADRG ES4。<code>OP_BB2</code> 是另一操作集合，只有规则明确写出 <code>ZYSS in OP_BB2</code> 等条件时才参与判断。若已选 MDC 下没有 ADRG 条件成立，当前 Demo 会显示未能完成分组，不会擅自换到下一 MDC。</p>
           </section>
           <section class="flow-card" id="drg-final">
@@ -563,7 +565,7 @@
             <span class="flow-index">10 · 易错与易混淆</span>
             <h2>判断时需要分清的几个位置</h2>
             <ol class="flow-chain">
-              <li><strong>集合编号由规则指定。</strong><code>DI_</code> 是诊断集合，<code>OP_</code> 是手术／操作集合。<code>DI_B00</code> 按完整集合编号取数，不能只按 <code>DI_B</code> 前缀取一组集合，也不能拿 <code>OP_</code> 集合判断主诊断；同一诊断编码可出现在多个诊断集合。</li>
+              <li><strong>集合编号由当前规则指定，不由编码的首次出现位置决定。</strong><code>DI_</code> 是诊断集合，<code>OP_</code> 是手术／操作集合。同一诊断可出现在多个 DI 集合；<code>C49.503</code> 在 MDCM 规则里查 DI_M00，在 MR1 规则里查 DI_MR1。两次都用原始编码分别判断成员关系；不能按“集合”表行顺序选第一个，也不能只按集合编号前缀合并集合。</li>
               <li><strong>不要跳过先期分组。</strong>MDCA 可以凭主操作先命中，因而同一主诊断有无特殊操作、主次顺序不同，都可能走到不同 MDC。</li>
               <li><strong>不要跨层找规则。</strong>已得到 MDC 后，只查所属 ADRG；已得到 ADRG 后，只查所属 DRG。每层以表内排序和首个满足条件的行决定结果。</li>
               <li><strong>CC 标记还要经过排除表。</strong>CC 表给出其他诊断的类型及排除编号；主诊断若在对应排除集合中，这条其他诊断不触发该 CC/MCC 条件。</li>
